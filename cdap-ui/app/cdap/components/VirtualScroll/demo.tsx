@@ -14,9 +14,12 @@
  * the License.
  */
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import VirtualScroll from './index';
 import withStyles from '@material-ui/core/styles/withStyles';
+import FormGroup from '@material-ui/core/FormGroup';
+import FormControlLabel from '@material-ui/core/FormControlLabel';
+import Switch from '@material-ui/core/Switch';
 
 const styles = () => {
   return {
@@ -34,8 +37,11 @@ const styles = () => {
       lineHeight: '20px',
       background: 'hotpink',
       maxWidth: '200px',
-      margin: '0 auto',
+      margin: '0 10px',
       boxShadow: '0 0 1px 0 rgba(0, 0, 0, 0.5)',
+    },
+    checkbox: {
+      padding: '0 10px',
     },
   };
 };
@@ -46,22 +52,67 @@ const Item = ({ index, classes }): React.ReactElement => (
   </div>
 );
 const StyledItem = withStyles(styles)(Item);
-const myList = new Array(100000).fill(null);
-
-function renderList(visibleNodeCount, startNode) {
+let myList = new Array(100).fill(null);
+let promise;
+function renderList(checked, visibleNodeCount, startNode) {
+  if (checked) {
+    if (promise) {
+      return promise;
+    }
+    let newList = myList.slice(startNode, startNode + visibleNodeCount);
+    newList = newList.map((_, index) => (
+      <StyledItem key={index + startNode} index={index + startNode} />
+    ));
+    if (newList.length < visibleNodeCount) {
+      promise = new Promise((resolve) => {
+        setTimeout(() => {
+          myList = myList.concat(new Array(100).fill(null));
+          resolve(
+            myList
+              .slice(startNode, startNode + visibleNodeCount)
+              .map((_, index) => <StyledItem key={index + startNode} index={index + startNode} />)
+          );
+          promise = null;
+        }, 2000);
+      });
+    }
+    return newList;
+  }
   return myList
     .slice(startNode, startNode + visibleNodeCount)
     .map((_, index) => <StyledItem key={index + startNode} index={index + startNode} />);
 }
 
 function App({ classes }) {
+  const [checked, setChecked] = useState(true);
+  useEffect(() => {
+    if (!checked) {
+      myList = new Array(100000).fill(null);
+    } else {
+      myList = new Array(100).fill(null);
+    }
+  }, [checked]);
   return (
     <div className={classes.container}>
+      <FormGroup>
+        <FormControlLabel
+          className={classes.checkbox}
+          control={
+            <Switch
+              checked={checked}
+              onChange={() => setChecked(!checked)}
+              name="promisify"
+              color="primary"
+            />
+          }
+          label="Promisify"
+        />
+      </FormGroup>
       <VirtualScroll
-        itemCount={myList.length}
+        itemCount={() => myList.length}
         visibleChildCount={20}
         childHeight={30}
-        renderList={renderList}
+        renderList={renderList.bind(null, checked)}
         childrenUnderFold={5}
       />
     </div>

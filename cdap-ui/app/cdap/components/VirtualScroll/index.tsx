@@ -14,13 +14,16 @@
  * the License.
  */
 
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo, useState, useEffect } from 'react';
 import withStyles, { StyleRules, WithStyles } from '@material-ui/core/styles/withStyles';
 import { useScroll } from 'components/VirtualScroll/useScroll';
 
 interface IVirtualScrollProps extends WithStyles<typeof styles> {
-  renderList: (visibleNodeCount: number, startNode: number) => React.ReactNode;
-  itemCount: number;
+  renderList: (
+    visibleNodeCount: number,
+    startNode: number
+  ) => React.ReactNode | Promise<React.ReactNode>;
+  itemCount: number | (() => number);
   visibleChildCount: number;
   childHeight: number;
   childrenUnderFold: number;
@@ -37,6 +40,16 @@ const styles = (): StyleRules => {
       willChange: 'transform',
       position: 'relative',
     },
+    loading: {
+      position: 'absolute',
+      background: 'purple',
+      bottom: '0',
+      height: '30px',
+      color: 'white',
+      width: '200px',
+      marginLeft: '10px',
+      textAlign: 'center',
+    },
   };
 };
 
@@ -47,26 +60,44 @@ const VirtualScroll = ({
   visibleChildCount,
   childHeight,
   childrenUnderFold,
-  LoadingElement = () => 'Loading...',
   classes,
+  LoadingElement = () => 'Loading...',
 }: IVirtualScrollProps) => {
   const [scrollTop, ref] = useScroll();
-  const totalHeight = itemCount * childHeight;
+  const itmCount = typeof itemCount === 'function' ? itemCount() : itemCount;
+  const totalHeight = itmCount * childHeight;
   const [list, setList] = useState<React.ReactNode>([]);
+  const [promise, setPromise] = useState(null);
 
   let startNode = Math.floor(scrollTop / childHeight) - childrenUnderFold;
   startNode = Math.max(0, startNode);
 
-  let visibleNodeCount = visibleChildCount + 2 * childrenUnderFold;
-  visibleNodeCount = Math.min(itemCount - startNode, visibleNodeCount);
+  const visibleNodeCount = visibleChildCount + 2 * childrenUnderFold;
 
   const offsetY = startNode * childHeight;
 
   useMemo(() => {
     const newList = renderList(visibleNodeCount, startNode);
-    setList(newList);
+    if (Array.isArray(newList)) {
+      setList(newList);
+    }
+    if (Array.isArray(newList) && newList.length < visibleNodeCount) {
+      const p = renderList(visibleChildCount, startNode);
+      if (p instanceof Promise && Array.isArray(list)) {
+        setPromise(p);
+      }
+    }
   }, [startNode, visibleNodeCount]);
 
+  useEffect(() => {
+    if (!promise) {
+      return;
+    }
+    promise.then((newList) => {
+      setList(newList);
+      setPromise(null);
+    });
+  }, [promise]);
   return (
     <div style={{ height: visibleChildCount * childHeight }} className={classes.root} ref={ref}>
       <div
@@ -83,6 +114,7 @@ const VirtualScroll = ({
         >
           {list}
         </div>
+        {promise ? <div className={classes.loading}>Loading...</div> : null}
       </div>
     </div>
   );
