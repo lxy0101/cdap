@@ -39,6 +39,7 @@ import io.cdap.cdap.etl.common.submit.CompositeFinisher;
 import io.cdap.cdap.etl.common.submit.Finisher;
 import io.cdap.cdap.internal.io.SchemaTypeAdapter;
 import org.apache.spark.SparkConf;
+import org.apache.spark.storage.StorageLevel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +96,7 @@ public class ETLSpark extends AbstractSpark {
 
     SparkConf sparkConf = new SparkConf();
     sparkConf.set("spark.speculation", "false");
-//    sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
+    sparkConf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer");
     context.setSparkConf(sparkConf);
 
     Map<String, String> properties = context.getSpecification().getProperties();
