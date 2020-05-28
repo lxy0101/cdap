@@ -20,6 +20,7 @@ import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.etl.spark.SparkCollection;
 
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Data to join.

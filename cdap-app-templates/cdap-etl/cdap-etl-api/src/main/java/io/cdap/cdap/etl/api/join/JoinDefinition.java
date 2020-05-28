@@ -79,6 +79,7 @@ public class JoinDefinition {
     private final List<JoinField> selectedFields;
     private JoinCondition condition;
     private String schemaName;
+    private Schema outputSchema;
 
     private Builder() {
       stages = new ArrayList<>();
@@ -118,6 +119,19 @@ public class JoinDefinition {
     }
 
     /**
+     * Set the output schema for the join. This should only be set if the input JoinStages do not contain known
+     * schemas. The most common scenario here is when the input schemas are not known when the pipeline is deployed
+     * due to macros.
+     *
+     * When all input schemas are known, if the expected output schema differs from this schema, an error
+     * will be thrown.
+     */
+    public Builder setOutputSchema(Schema outputSchema) {
+      this.outputSchema = outputSchema;
+      return this;
+    }
+
+    /**
      * @return a valid JoinDefinition
      *
      * @throws InvalidJoinException if the join is invalid
@@ -142,7 +156,14 @@ public class JoinDefinition {
       }
       condition.validate(stages);
 
-      return new JoinDefinition(selectedFields, stages, condition, getOutputSchema());
+      Schema generatedOutputSchema = getOutputSchema();
+      if (generatedOutputSchema != null && outputSchema != null) {
+        // verify that the plugin defined output schema is compatible with the actual output schema
+        validateSchemaCompatibility(generatedOutputSchema, outputSchema);
+      }
+
+      return new JoinDefinition(selectedFields, stages, condition,
+                                outputSchema == null ? generatedOutputSchema : outputSchema);
     }
 
     @Nullable
@@ -187,6 +208,56 @@ public class JoinDefinition {
       }
 
       return Schema.recordOf(schemaName == null ? "joined" : schemaName, outputFields);
+    }
+
+    /**
+     * Validate that the first schema is compatible with the second. Schema s1 is compatible with schema s2 if all
+     * the fields in s1 are present in s2 with the same type, or with the nullable version of the type. In addition,
+     * s2 cannot contain any fields that are not present in s1.
+     *
+     * @param expected the expected schema
+     * @param provided the provided schema
+     */
+    private static void validateSchemaCompatibility(Schema expected, Schema provided) {
+      Set<String> missingFields = new HashSet<>();
+      for (Schema.Field expectedField : expected.getFields()) {
+        Schema.Field providedField = provided.getField(expectedField.getName());
+        if (providedField == null) {
+          missingFields.add(expectedField.getName());
+          continue;
+        }
+        Schema expectedFieldSchema = expectedField.getSchema();
+        Schema providedFieldSchema = providedField.getSchema();
+        boolean expectedIsNullable = expectedFieldSchema.isNullable();
+        boolean providedIsNullable = providedFieldSchema.isNullable();
+        expectedFieldSchema = expectedIsNullable ? expectedFieldSchema.getNonNullable() : expectedFieldSchema;
+        providedFieldSchema = providedIsNullable ? providedFieldSchema.getNonNullable() : providedFieldSchema;
+        if (expectedFieldSchema.getType() != providedFieldSchema.getType()) {
+          throw new InvalidJoinException(String.format(
+            "Provided schema does not match expected schema. Field '%s' is a '%s' but is expected to be a '%s'",
+            expectedField.getName(), expectedFieldSchema.getDisplayName(), providedFieldSchema.getDisplayName()));
+        }
+        if (expectedIsNullable && !providedIsNullable) {
+          throw new InvalidJoinException(String.format(
+            "Provided schema does not match expected schema. Field '%s' should be nullable",
+            expectedField.getName()));
+        }
+      }
+
+      if (!missingFields.isEmpty()) {
+        throw new InvalidJoinException("Provided schema is missing fields: " + String.join(", ", missingFields));
+      }
+
+      Set<String> extraFields = new HashSet<>();
+      for (Schema.Field providedField : provided.getFields()) {
+        if (expected.getField(providedField.getName()) == null) {
+          extraFields.add(providedField.getName());
+        }
+      }
+
+      if (!extraFields.isEmpty()) {
+        throw new InvalidJoinException("Provided schema has extra fields: " + String.join(", ", missingFields));
+      }
     }
   }
 

@@ -20,6 +20,7 @@ import io.cdap.cdap.api.data.schema.Schema;
 import io.cdap.cdap.etl.api.join.JoinField;
 
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Request to join some collection to another collection.

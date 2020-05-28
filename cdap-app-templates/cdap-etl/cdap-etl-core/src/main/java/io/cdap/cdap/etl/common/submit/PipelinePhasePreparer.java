@@ -158,6 +158,7 @@ public abstract class PipelinePhasePreparer {
     // point all macros should be evaluated and the definition should be non-null.
     String stageName = stageSpec.getName();
     String pluginName = stageSpec.getPlugin().getName();
+
     AutoJoinerContext autoJoinerContext = DefaultAutoJoinerContext.from(stageSpec.getInputSchemas());
     JoinDefinition joinDefinition = autoJoiner.define(autoJoinerContext);
     if (joinDefinition == null) {

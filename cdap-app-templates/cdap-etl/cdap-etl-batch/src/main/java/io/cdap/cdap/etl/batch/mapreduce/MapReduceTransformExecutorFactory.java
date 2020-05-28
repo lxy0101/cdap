@@ -195,7 +195,7 @@ public class MapReduceTransformExecutorFactory<T> {
         DefaultAutoJoinerContext context = DefaultAutoJoinerContext.from(stageSpec.getInputSchemas());
         // definition will be non-null due to validate by PipelinePhasePreparer at the start of the run
         JoinDefinition joinDefinition = autoJoiner.define(context);
-        batchJoiner = new JoinerBridge(autoJoiner, joinDefinition);
+        batchJoiner = new JoinerBridge(stageName, autoJoiner, joinDefinition);
         JoinCondition condition = joinDefinition.getCondition();
         // null safe equality means A.id = B.id will match when the id is null
         // if it's not null safe, A.id = B.id will not match when the id is null
